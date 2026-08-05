@@ -9,11 +9,11 @@ export class Compositor {
     this.frames = 0;
     this.opts = {
       fit: 'cover', // cover | contain
-      pipScale: 0.3, // 画中画宽度占主画面宽度的比例
+      pipScale: 0.28, // 画中画宽度占主画面宽度的比例
       pipCorner: 'br', // br | bl | tr | tl
-      pipMargin: 0.028, // 边距，占主画面宽度比例
+      pipMargin: 0.01, // 边距，占主画面宽度比例，越小越贴边
       pipMirror: true,
-      pipRadius: 0.02, // 圆角，占主画面宽度比例
+      pipRadius: 0.015, // 圆角，占主画面宽度比例
       pipBorder: true,
       showPip: true,
       background: '#000000',
