@@ -270,7 +270,7 @@ server.on('upgrade', (req, socket, head) => {
     upstream.on('open', () => {
       log(`WS 上游已连接 live_id=${liveId}`);
       client.send(JSON.stringify({ __proxy: 'upstream_open' }));
-      for (const m of pending.splice(0)) upstream.send(m);
+      for (const { data, isBinary } of pending.splice(0)) upstream.send(data, { binary: isBinary });
     });
     upstream.on('message', (data, isBinary) => {
       if (client.readyState === WebSocket.OPEN) client.send(data, { binary: isBinary });
@@ -293,7 +293,7 @@ server.on('upgrade', (req, socket, head) => {
 
     client.on('message', (data, isBinary) => {
       if (upstream.readyState === WebSocket.OPEN) upstream.send(data, { binary: isBinary });
-      else if (upstream.readyState === WebSocket.CONNECTING) pending.push(data);
+      else if (upstream.readyState === WebSocket.CONNECTING) pending.push({ data, isBinary });
     });
     client.on('close', () => {
       log(`WS 客户端关闭 live_id=${liveId}`);
