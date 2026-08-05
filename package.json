@@ -1,0 +1,18 @@
+{
+  "name": "wanstreamer-demo",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Vidu S1 demo recorder — S1 video as main frame, local webcam as bottom-right PiP, single-channel mixed audio",
+  "scripts": {
+    "start": "node server/index.mjs",
+    "dev": "node --watch server/index.mjs",
+    "mp4": "node scripts/to-mp4.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Vidu S1 Demo 录制器</title>
+<link rel="stylesheet" href="/styles.css" />
+<!-- rtc-tap 必须排在 SDK 之前：它要替换 window.RTCPeerConnection -->
+<script src="/rtc-tap.js"></script>
+<script src="/vendor/aliyun-rtc-sdk.js"></script>
+</head>
+<body>
+<header>
+  <h1>Vidu S1 Demo 录制器</h1>
+  <div class="head-right">
+    <span id="cfgBadge" class="badge">读取配置…</span>
+    <span id="stateBadge" class="badge">未连接</span>
+  </div>
+</header>
+
+<main>
+  <section class="stage">
+    <div class="canvas-wrap">
+      <canvas id="stage" width="720" height="1280"></canvas>
+      <div id="recDot" class="rec-dot hidden"><span></span><b id="recTime">00:00</b></div>
+      <div id="placeholder" class="placeholder">
+        <p>点这里开始 →</p>
+        <p class="dim">填好人设与形象图，点「创建会话并连接」。<br />画面即为最终录制内容（所见即所得）。</p>
+      </div>
+    </div>
+
+    <div class="meters">
+      <label>混音电平</label>
+      <div class="meter"><i id="lvlMix"></i></div>
+      <span id="chBadge" class="badge sm">声道 —</span>
+      <span id="fpsBadge" class="badge sm">— fps</span>
+      <span id="sizeBadge" class="badge sm">— px</span>
+    </div>
+
+    <div class="row buttons">
+      <button id="btnConnect" class="primary">创建会话并连接</button>
+      <button id="btnRec" disabled>● 开始录制</button>
+      <button id="btnStop" disabled>■ 停止并保存</button>
+      <button id="btnInterrupt" disabled>打断</button>
+      <button id="btnHangup" class="danger" disabled>挂断</button>
+    </div>
+
+    <div class="row">
+      <input id="textInput" type="text" placeholder="给数字人发一句文本（回车发送）" disabled />
+      <button id="btnSend" disabled>发送</button>
+    </div>
+
+    <div class="log-wrap">
+      <div class="log-head">
+        <span>运行日志</span>
+        <label class="inline"><input type="checkbox" id="verbose" /> 显示全部 WS 报文</label>
+      </div>
+      <div id="log" class="log"></div>
+    </div>
+  </section>
+
+  <aside class="panel">
+    <details open>
+      <summary>数字人配置</summary>
+      <label>交互方式 call_mode
+        <select id="callMode">
+          <option value="video" selected>video（音视频，S1 看得到你）</option>
+          <option value="audio">audio（纯语音）</option>
+        </select>
+      </label>
+      <label>人设 persona
+        <textarea id="persona" rows="5">你是甜甜 Tina，一位热情友好的产品演示助手。语气自然、简洁、口语化，每次回答控制在两三句话以内。</textarea>
+      </label>
+      <label>形象图 image_uri
+        <input id="imageUri" type="text" placeholder="https://…png 或 ssupload:?id=…" value="https://scene.cf.vidu.studio/media-asset/070302-ZFkgvJxBTM0ZQJoO.png" />
+      </label>
+      <div class="row">
+        <input type="file" id="imageFile" accept="image/png,image/jpeg,image/webp" />
+        <button id="btnUpload" class="ghost">上传本地图片</button>
+      </div>
+      <label>音色 voice
+        <div class="row">
+          <input id="voice" type="text" value="Tina" placeholder="Tina" />
+          <button id="btnVoices" class="ghost">拉取音色</button>
+        </div>
+      </label>
+      <label>开场问候提示 greeting_instruction（可空）
+        <input id="greeting" type="text" placeholder="用一句话热情地打招呼并介绍自己" />
+      </label>
+    </details>
+
+    <details>
+      <summary>打断与对话参数</summary>
+      <label>VAD 类型
+        <select id="vadType">
+          <option value="server" selected>server（过滤附和/背景音）</option>
+          <option value="semantic">semantic（开口即打断）</option>
+        </select>
+      </label>
+      <label>静音触发时长 silence_duration_ms <span id="silLbl" class="dim">400</span>
+        <input id="silence" type="range" min="200" max="6000" step="50" value="400" />
+      </label>
+      <label>主动发起对话 idle_timeout_ms <span id="idleLbl" class="dim">0（关闭）</span>
+        <input id="idleMs" type="range" min="0" max="30000" step="500" value="0" />
+      </label>
+      <label>最大输出长度 max_tokens <span id="tokLbl" class="dim">120</span>
+        <input id="maxTokens" type="range" min="16" max="1024" step="8" value="120" />
+      </label>
+      <label class="inline"><input type="checkbox" id="transcription" checked /> 开启语音转写（日志里显示字幕）</label>
+      <label class="inline"><input type="checkbox" id="extraMotion" checked /> extra_motion 额外动作</label>
+    </details>
+
+    <details open>
+      <summary>画面合成</summary>
+      <label>输出尺寸
+        <select id="outSize">
+          <option value="auto" selected>跟随 S1 画面（推荐）</option>
+          <option value="1080x1920">1080×1920 竖屏</option>
+          <option value="720x1280">720×1280 竖屏</option>
+          <option value="1920x1080">1920×1080 横屏</option>
+          <option value="1280x720">1280×720 横屏</option>
+        </select>
+      </label>
+      <label>主画面缩放
+        <select id="fit">
+          <option value="cover" selected>cover（铺满，可能裁边）</option>
+          <option value="contain">contain（完整显示，可能留黑边）</option>
+        </select>
+      </label>
+      <label>画中画位置
+        <select id="pipCorner">
+          <option value="br" selected>右下角</option>
+          <option value="bl">左下角</option>
+          <option value="tr">右上角</option>
+          <option value="tl">左上角</option>
+        </select>
+      </label>
+      <label>画中画大小 <span id="pipLbl" class="dim">30%</span>
+        <input id="pipScale" type="range" min="12" max="50" step="1" value="30" />
+      </label>
+      <label class="inline"><input type="checkbox" id="pipMirror" checked /> 画中画左右镜像</label>
+      <label class="inline"><input type="checkbox" id="pipBorder" checked /> 画中画白边</label>
+      <label class="inline"><input type="checkbox" id="showPip" checked /> 显示画中画</label>
+      <label>录制帧率 <span id="fpsLbl" class="dim">30</span>
+        <input id="fps" type="range" min="15" max="60" step="1" value="30" />
+      </label>
+    </details>
+
+    <details open>
+      <summary>音频</summary>
+      <p class="dim small">输出固定为<b>单声道</b>：S1 音频与本地麦克风在 WebAudio 里降混成 1 channel 后编码。</p>
+      <label>S1 音量 <span id="gBotLbl" class="dim">100%</span>
+        <input id="gainBot" type="range" min="0" max="200" step="5" value="100" />
+      </label>
+      <label>麦克风音量 <span id="gMicLbl" class="dim">100%</span>
+        <input id="gainMic" type="range" min="0" max="200" step="5" value="100" />
+      </label>
+      <label class="inline"><input type="checkbox" id="monitor" /> 监听 S1 声音（听不到数字人时打开）</label>
+      <p class="warn small">请戴耳机录制。用扬声器时 S1 的声音会被麦克风二次拾取，混音里会出现回声。</p>
+    </details>
+
+    <details>
+      <summary>会话信息</summary>
+      <div id="liveInfo" class="kv dim small">尚未创建会话</div>
+      <button id="btnBill" class="ghost" disabled>查询状态与计费</button>
+    </details>
+  </aside>
+</main>
+
+<script type="module" src="/app.js"></script>
+</body>
+</html>
