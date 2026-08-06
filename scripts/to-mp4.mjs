@@ -5,6 +5,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import ffmpegBin from 'ffmpeg-static';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 try {
@@ -24,9 +25,10 @@ if (!files.length) {
 
 const ffmpeg = (args) =>
   new Promise((resolve) => {
-    const p = spawn('ffmpeg', args, { stdio: ['ignore', 'ignore', 'inherit'], windowsHide: true });
+    const bin = ffmpegBin || 'ffmpeg';
+    const p = spawn(bin, args, { stdio: ['ignore', 'ignore', 'inherit'], windowsHide: true });
     p.on('error', (e) => resolve(e.message));
-    p.on('close', (code) => resolve(code === 0 ? null : `ffmpeg exit ${code}`));
+    p.on('close', (code) => resolve(code === 0 ? null : `${bin} exit ${code}`));
   });
 
 for (const f of files) {

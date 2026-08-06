@@ -8,6 +8,9 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer, WebSocket } from 'ws';
+// 自带 ffmpeg/ffprobe 二进制，不依赖系统是否安装
+import ffmpegBin from 'ffmpeg-static';
+import ffprobeBin from 'ffprobe-static';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -145,6 +148,18 @@ async function uploadImage(req, res) {
   res.end(text);
 }
 
+const FFMPEG = ffmpegBin || 'ffmpeg';
+const FFPROBE = ffprobeBin?.path || 'ffprobe';
+
+/** 用自带二进制运行，失败时回退到系统命令（兼容旧环境） */
+function choose(pick, fallback) {
+  try {
+    return fs.existsSync(pick) ? pick : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 function run(cmd, args) {
   return new Promise((resolve) => {
     const p = spawn(cmd, args, { windowsHide: true });
@@ -175,7 +190,7 @@ async function saveRecording(req, res, url) {
   log(`录像已保存 ${webm} (${(size / 1e6).toFixed(1)} MB)`);
   const result = { webm, size, dir: REC_DIR };
 
-  const probe = await run('ffprobe', [
+  const probe = await run(choose(FFPROBE, 'ffprobe'), [
     '-v', 'error', '-select_streams', 'a:0',
     '-show_entries', 'stream=channels,codec_name,sample_rate',
     '-of', 'json', webm,
@@ -190,7 +205,7 @@ async function saveRecording(req, res, url) {
   if (wantMp4) {
     const mp4 = webm.replace(/\.webm$/, '.mp4');
     // -ac 1 兜底保证单声道；-r 30 -fps_mode cfr 把画布的可变帧率拍成恒定帧率
-    const ff = await run('ffmpeg', [
+    const ff = await run(choose(FFMPEG, 'ffmpeg'), [
       '-y', '-i', webm,
       '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p',
       '-r', '30', '-fps_mode', 'cfr',

@@ -57,6 +57,9 @@ export class Compositor {
 
   start() {
     if (this.raf) return;
+    this._lastMainT = -1;
+    this._lastPipT = -1;
+    this._drewOnce = false;
     const draw = () => {
       this.raf = requestAnimationFrame(draw);
       this.drawFrame();
@@ -69,19 +72,38 @@ export class Compositor {
     this.raf = 0;
   }
 
+  /** 该视频元素是否产生了新的一帧（供空帧跳过，避免录制帧率被各方波动拖垮） */
+  _changed(video) {
+    if (!isReady(video)) return false; // 没画面：不画
+    if (video.currentTime !== this[`_last${video === this.main ? 'Main' : 'Pip'}T`]) {
+      this[`_last${video === this.main ? 'Main' : 'Pip'}T`] = video.currentTime;
+      return true;
+    }
+    return false; // 与上次同一帧（还没解出新帧），跳过这次绘制
+  }
+
   drawFrame() {
     const { ctx, canvas, opts } = this;
     const W = canvas.width;
     const H = canvas.height;
 
+    // 画面没有任何新内容时跳过重绘，让 captureStream 的帧率保持稳定，减少掉帧
+    const mainNew = this._changed(this.main);
+    const pipNew = this._changed(this.pip);
+    if (!mainNew && !pipNew && this._drewOnce) {
+      this.frames++; // 仍计入帧数供 fps badge 用，但不再产生新帧数据
+      return;
+    }
+    this._drewOnce = true;
+
     ctx.fillStyle = opts.background;
     ctx.fillRect(0, 0, W, H);
 
-    if (isReady(this.main)) {
+    if (isReady(this.main) && mainNew) {
       drawFitted(ctx, this.main, 0, 0, W, H, opts.fit, false);
     }
 
-    if (opts.showPip && isReady(this.pip)) {
+    if (opts.showPip && isReady(this.pip) && pipNew) {
       const pw = Math.round(W * opts.pipScale);
       const ar = this.pip.videoWidth / this.pip.videoHeight;
       const ph = Math.round(pw / (ar || 16 / 9));
