@@ -138,13 +138,18 @@ async function connect() {
     state.connected = true;
     ui.placeholder.classList.add('hidden');
     setState('已连接', 'ok');
-    ui.btnRec.disabled = false;
+    ui.btnRec.disabled = true; // 自动录制接管，手动按钮本会话不再开始
     ui.btnHangup.disabled = false;
     ui.btnInterrupt.disabled = false;
     ui.btnSend.disabled = false;
     ui.textInput.disabled = false;
     log('控制链路与媒体链路均已就绪，可以开始录制', 'ok');
     startLiveCountdown();
+
+    // 一连上就自动开始录制；结束后通过「■ 停止并保存」保存
+    ui.btnRec.disabled = true;
+    await startRecording();
+    log('已自动开始录制，点「■ 停止并保存」结束', 'ok');
   } catch (err) {
     log(`连接失败: ${err.message}`, 'error');
     setState('失败', 'bad');
