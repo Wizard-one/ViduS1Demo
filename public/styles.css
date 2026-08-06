@@ -228,6 +228,7 @@ label.inline input { width: auto; margin: 0; }
 .log .error { color: var(--danger); }
 .log .ok { color: var(--ok); }
 .log .say { color: #9fc4ff; }
+.log .diag { color: #7c8698; font-style: italic; }
 
 .kv { font: 11.5px/1.7 ui-monospace, Consolas, monospace; white-space: pre-wrap; margin-bottom: 8px; }
 .dim { color: var(--dim); }

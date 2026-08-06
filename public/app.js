@@ -470,7 +470,7 @@ function applyOutputSize() {
   ui.sizeBadge.textContent = `${ui.canvas.width}×${ui.canvas.height} px`;
 }
 
-// ---------- 仪表刷新 ----------
+// ---------- 仪表刷新（含卡顿排查监控） ----------
 setInterval(() => {
   if (state.recorder) {
     const lvl = Math.min(1, state.recorder.level() * 4);
@@ -487,7 +487,53 @@ setInterval(() => {
     state.lastFrames = f;
     state.lastFpsAt = now;
   }
+  if (now - state.lastDiagAt >= 5000) {
+    state.lastDiagAt = now;
+    reportDiag();
+  }
 }, 100);
+
+// 每 5s 汇总一次各方指标，帮助区分卡顿来自网络/编解码/本实现哪一层
+function reportDiag() {
+  const now = Date.now();
+  const dtSec = (now - (state._prevDiagAt ?? now)) / 1000;
+  const draws = state.compositor._draws ?? 0;
+  const frames = state.compositor.frames;
+
+  const rendFps = state._prevDiagAt ? Math.round(((draws - state._prevDraws) / dtSec)) : 0;
+  const captureFps = state._prevDiagAt ? Math.round(((frames - state._prevFrames) / dtSec)) : 0;
+  state._prevDraws = draws;
+  state._prevFrames = frames;
+  state._prevDiagAt = now;
+
+  const main = state.mainVideo;
+  const pip = state.pipVideo;
+  const q = main?.getVideoPlaybackQuality?.();
+  const rec = state.recorder;
+  const recState = rec?.recorder?.state ?? 'none';
+
+  log(`[diag] 合成本帧渲染画布=${rendFps}fps captureStream=${captureFps}fps rec=${recState} canvas=${ui.canvas.width}×${ui.canvas.height}`, 'diag');
+  if (main) {
+    const filled = isVideoFilled(main);
+    const drop = q ? q.droppedVideoFrames : 'n/a';
+    const total = q ? q.totalVideoFrames : 'n/a';
+    log(`[diag] 主画面元素 ${filled ? '有画面' : '未出图'} readyState=${main.readyState} | 播放质量 total=${total} dropped=${drop}`, 'diag');
+  }
+  if (pip) {
+    log(`[diag] 摄像头元素 ${isVideoFilled(pip) ? '有画面' : '未出图'}`, 'diag');
+  }
+  if (rec?.recorder?.state === 'recording') {
+    const s = rec.recorder.audioBitsPerSecond ?? '-';
+    const bytes = (rec.chunks ?? []).reduce((a, c) => a + c.size, 0);
+    log(`[diag] 编码器 ua=${navigator.userAgent.match(/Chrome\/(\d+)/)?.[1] || '?'} audioBits=${s} 已编码=${(bytes / 1e6).toFixed(1)}MB`, 'diag');
+  } else if (recState === 'none') {
+    log('[diag] 尚未开始录制（recorder 未启动）', 'diag');
+  }
+}
+
+function isVideoFilled(v) {
+  return !!(v && v.readyState >= 2 && v.videoWidth > 0 && v.videoHeight > 0);
+}
 
 // ---------- 事件绑定 ----------
 ui.btnConnect.onclick = connect;

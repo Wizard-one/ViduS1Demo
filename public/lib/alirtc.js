@@ -83,9 +83,29 @@ export class RtcClient {
   bindRemoteView(videoEl, userId, streamType) {
     try {
       this.engine.setRemoteViewConfig(videoEl, userId, streamType);
-      // 这个元素只是合成器的取帧源，声音走 WebAudio；SDK 另有内部 audio 元素负责播放
+      // 元素只是合成器的取帧源，声音走 WebAudio；SDK 另有内部 audio 元素负责播放
       videoEl.muted = true;
       videoEl.play?.().catch(() => {});
+
+      // 采集远端码流的实时网络指标（AliRTC 自报），用于区分卡顿是网络还是本地编码
+      this.remoteUserId = userId;
+      this._statsTimer = setInterval(() => {
+        try {
+          const s = this.engine.getAvgRttMs?.() ?? this.engine.getRtt?.() ?? null;
+          const loss = this.engine.getDownstreamVideoLossRate?.() ?? this.engine.getVideoLossRate?.() ?? null;
+          if (s != null || loss != null) {
+            const kb = this.engine.getDownstreamVideoBitrate?.() ?? null;
+            this.log(
+              `[diag] 远端网络 S1码流: rtt=${s != null ? s + 'ms' : 'n/a'} loss=${loss != null ? (loss * 100).toFixed(1) + '%' : 'n/a'} 下行码率=${kb != null ? (kb / 1000).toFixed(1) + 'kbps' : 'n/a'}`,
+              'diag',
+            );
+          } else {
+            this.log('[diag] 远端网络：SDK 未提供 rtt/loss 统计（该版本可能不全）', 'diag');
+          }
+        } catch (err) {
+          this.log(`[diag] 取 S1 网络统计失败: ${err.message}`, 'diag');
+        }
+      }, 5000);
       return true;
     } catch (err) {
       this.log(`setRemoteViewConfig 失败: ${err.message}`, 'error');
@@ -106,6 +126,8 @@ export class RtcClient {
 
   async leave() {
     if (!this.joined) return;
+    clearInterval(this._statsTimer);
+    this._statsTimer = null;
     try {
       await this.engine.leaveChannel();
       this.log('已离开 RTC 频道');

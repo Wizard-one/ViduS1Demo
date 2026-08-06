@@ -60,6 +60,7 @@ export class Compositor {
     this._lastMainT = -1;
     this._lastPipT = -1;
     this._drewOnce = false;
+    this._draws = 0;
     const draw = () => {
       this.raf = requestAnimationFrame(draw);
       this.drawFrame();
@@ -94,9 +95,11 @@ export class Compositor {
     const pipNew = this._changed(this.pip);
     if (!mainNew && !pipNew && this._drewOnce) {
       this.frames++; // 计入帧数供 fps badge 用，但不再产生新帧数据
+      this._draws++; // 计入每次 rAF 回调（含跳过），用于统计渲染开销
       return;
     }
     this._drewOnce = true;
+    this._draws++;
 
     ctx.fillStyle = opts.background;
     ctx.fillRect(0, 0, W, H);
