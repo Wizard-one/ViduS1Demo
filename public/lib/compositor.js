@@ -2,7 +2,7 @@
 export class Compositor {
   constructor(canvas) {
     this.canvas = canvas;
-    this.ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
+    this.ctx = canvas.getContext('2d', { alpha: false });
     this.main = null; // HTMLVideoElement
     this.pip = null; // HTMLVideoElement
     this.raf = 0;

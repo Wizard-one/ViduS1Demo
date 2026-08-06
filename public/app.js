@@ -20,7 +20,7 @@ const ui = {
 const state = {
   live: null, rtc: null, sig: null, rtcClient: null,
   compositor: new Compositor(ui.canvas), recorder: null,
-  mainVideo: null, pipVideo: null, ownStreams: [], untap: null,
+  canvasStream: null, mainVideo: null, pipVideo: null, ownStreams: [], untap: null,
   connected: false, hangingUp: false, lastFrames: 0, lastFpsAt: performance.now(),
 };
 
@@ -120,6 +120,8 @@ async function connect() {
 
     state.recorder = new MixRecorder({ canvas: ui.canvas, fps: Number($('fps').value) });
     state.recorder.setMonitor($('monitor').checked);
+    // 录制时的视频源：在连接阶段建一次，跟随 canvas 实际绘制节奏（含空帧节流→帧率稳定、不卡顿）
+    state.canvasStream = ui.canvas.captureStream(0);
 
     // 控制链路与媒体链路并行建立，两条都通才算 ready
     const control = startSignaling(created.live.id);
